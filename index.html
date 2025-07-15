@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medical PDF Analysis Dashboard</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -62,6 +61,7 @@
             background: linear-gradient(45deg, #f8faff, #eef4ff);
             position: relative;
             overflow: hidden;
+            cursor: pointer;
         }
 
         .upload-area:hover {
@@ -251,6 +251,27 @@
             opacity: 0.9;
         }
 
+        .findings-section {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .findings-section h3 {
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .findings-content {
+            line-height: 1.6;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
         .audiogram-section {
             background: #f8faff;
             border-radius: 15px;
@@ -352,7 +373,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🧠 Medical Report Analysis</h1>
+            <h1>🧠 Medical PDF Analysis</h1>
             <p>Advanced COGNISION Test Report Analysis Dashboard</p>
         </div>
 
@@ -370,7 +391,7 @@
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>Analyzing PDF... Please wait</p>
+            <p>Analyzing PDF with Python AI... Please wait</p>
         </div>
 
         <div class="results-section" id="results">
@@ -392,21 +413,6 @@
     </div>
 
     <script>
-        const clinicalRanges = {
-            'Button Press Accuracy': { normal: 94.1, mild_ad: 82.2, direction: 'lower' },
-            'False Alarms': { normal: 1.1, mild_ad: 4.9, direction: 'higher' },
-            'Median Reaction Time': { normal: 458, mild_ad: 499, direction: 'higher' },
-            'P50 Amplitude': { normal: 2.77, mild_ad: 2.95, direction: 'higher' },
-            'N100 Amplitude': { normal: -7.23, mild_ad: -6.00, direction: 'higher' },
-            'P200 Amplitude': { normal: 5.26, mild_ad: 4.64, direction: 'lower' },
-            'N200 Amplitude': { normal: -0.31, mild_ad: -1.10, direction: 'lower' },
-            'P3b Amplitude': { normal: 6.03, mild_ad: 4.42, direction: 'lower' },
-            'P3b Latency': { normal: 396.0, mild_ad: 419.6, direction: 'higher' },
-            'Slow Wave Amplitude': { normal: -2.54, mild_ad: -2.65, direction: 'lower' },
-            'P3a Amplitude': { normal: 5.88, mild_ad: 3.63, direction: 'lower' },
-            'Peak Alpha Frequency': { normal: 9.39, mild_ad: 8.34, direction: 'lower' }
-        };
-
         const metricIcons = {
             'Button Press Accuracy': '🎯',
             'False Alarms': '⚠️',
@@ -427,6 +433,7 @@
         const loading = document.getElementById('loading');
         const results = document.getElementById('results');
 
+        // Drag and drop functionality
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
@@ -469,9 +476,31 @@
             showLoading();
             
             try {
-                const text = await extractTextFromPDF(file);
-                const analysisResults = analyzeExtractedText(text);
-                displayResults(analysisResults);
+                // Create FormData to send PDF to Python backend
+                const formData = new FormData();
+                formData.append('pdf', file);
+                
+                // Send PDF to Python API for processing
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Analysis failed');
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Process the results from Python extractor
+                    const analysisResults = processApiResults(result.data);
+                    displayResults(analysisResults);
+                } else {
+                    throw new Error(result.error || 'Analysis failed');
+                }
+                
             } catch (error) {
                 showError('Error processing PDF: ' + error.message);
             } finally {
@@ -479,117 +508,34 @@
             }
         }
 
-        async function extractTextFromPDF(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-            let text = '';
+        function processApiResults(apiData) {
+            // Extract data from your Python SimpleMedicalExtractor results
+            const values = apiData.extracted_values || {};
+            const interpretations = apiData.clinical_interpretations || {};
+            const audiogramData = apiData.audiogram_data || null;
+            const findings = apiData.generated_study_findings || '';
+            const discussion = apiData.generated_study_discussion || '';
             
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const content = await page.getTextContent();
-                text += content.items.map(item => item.str).join(' ') + '\n';
-            }
-            
-            return text;
-        }
-
-        function analyzeExtractedText(text) {
-            const values = extractValues(text);
-            const interpretations = calculateInterpretations(values);
-            const audiogramData = extractAudiogramData(text);
+            // Generate summary statistics
+            const summary = generateSummary(interpretations);
             
             return {
                 values,
                 interpretations,
+                summary,
                 audiogramData,
-                summary: generateSummary(interpretations)
+                findings,
+                discussion
             };
         }
 
-        function extractValues(text) {
-            const values = {};
-            const lines = text.split('\n').map(line => line.trim());
-            
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                
-                if (line.includes('Button Press Accuracy')) {
-                    const numbers = line.match(/\d+\.?\d*/g);
-                    if (numbers) values['Button Press Accuracy'] = parseFloat(numbers[numbers.length - 1]);
-                }
-                
-                if (line.includes('False Alarms')) {
-                    const numbers = line.match(/\d+\.?\d*/g);
-                    if (numbers) values['False Alarms'] = parseFloat(numbers[numbers.length - 1]);
-                }
-                
-                if (line.includes('Median Reaction Time')) {
-                    const numbers = line.match(/\d+\.?\d*/g);
-                    if (numbers) values['Median Reaction Time'] = parseFloat(numbers[numbers.length - 1]);
-                }
-                
-                if (line === 'P50' && i + 2 < lines.length) {
-                    try {
-                        values['P50 Amplitude'] = parseFloat(lines[i + 2]);
-                    } catch (e) {}
-                }
-                
-                if (line === 'P3b' && i + 3 < lines.length) {
-                    try {
-                        values['P3b Amplitude'] = parseFloat(lines[i + 2]);
-                        values['P3b Latency'] = parseFloat(lines[i + 3]);
-                    } catch (e) {}
-                }
-                
-                if (line === 'Peak Alpha' && i + 1 < lines.length) {
-                    try {
-                        values['Peak Alpha Frequency'] = parseFloat(lines[i + 1]);
-                    } catch (e) {}
-                }
-            }
-            
-            return values;
-        }
-
-        function calculateInterpretations(values) {
-            const interpretations = {};
-            
-            for (const [metric, value] of Object.entries(values)) {
-                if (clinicalRanges[metric]) {
-                    interpretations[metric] = calculateClinicalInterpretation(metric, value);
-                }
-            }
-            
-            return interpretations;
-        }
-
-        function calculateClinicalInterpretation(metric, value) {
-            if (!clinicalRanges[metric]) return 'Unknown';
-            
-            if (metric === 'Peak Alpha Frequency' && value < 8.0) {
-                return 'CRITICAL - RETEST REQUIRED';
-            }
-            
-            const range = clinicalRanges[metric];
-            const { normal, mild_ad, direction } = range;
-            
-            if (direction === 'lower') {
-                if (value <= mild_ad) return 'High Risk';
-                if (value < normal) return 'Borderline';
-                return 'Normal';
-            } else {
-                if (value >= mild_ad) return 'High Risk';
-                if (value > normal) return 'Borderline';
-                return 'Normal';
-            }
-        }
-
-        function extractAudiogramData(text) {
-            return null;
-        }
-
         function generateSummary(interpretations) {
-            const counts = { 'High Risk': 0, 'Borderline': 0, 'Normal': 0, 'CRITICAL - RETEST REQUIRED': 0 };
+            const counts = { 
+                'High Risk': 0, 
+                'Borderline': 0, 
+                'Normal': 0, 
+                'CRITICAL - RETEST REQUIRED': 0 
+            };
             
             Object.values(interpretations).forEach(interp => {
                 counts[interp] = (counts[interp] || 0) + 1;
@@ -599,14 +545,85 @@
         }
 
         function displayResults(analysisResults) {
-            const { values, interpretations, summary } = analysisResults;
+            const { values, interpretations, summary, audiogramData, findings } = analysisResults;
             
             displaySummary(summary);
             displayMetrics(values, interpretations);
             
+            // Display study findings if available
+            if (findings) {
+                displayStudyFindings(findings);
+            }
+            
+            // Display audiogram data if available
+            if (audiogramData && (audiogramData.left_ear || audiogramData.right_ear)) {
+                displayAudiogramData(audiogramData);
+            }
+            
             const resultsElement = document.getElementById('results');
             resultsElement.style.display = 'block';
             resultsElement.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function displayStudyFindings(findings) {
+            let findingsSection = document.getElementById('studyFindings');
+            
+            if (!findingsSection) {
+                // Create findings section
+                findingsSection = document.createElement('div');
+                findingsSection.id = 'studyFindings';
+                findingsSection.className = 'findings-section';
+                findingsSection.innerHTML = `
+                    <h3>📋 Study Findings</h3>
+                    <div class="findings-content"></div>
+                `;
+                
+                const resultsContainer = document.getElementById('results');
+                const summarySection = document.getElementById('summary');
+                resultsContainer.insertBefore(findingsSection, summarySection.nextSibling);
+            }
+            
+            findingsSection.querySelector('.findings-content').innerHTML = findings;
+        }
+
+        function displayAudiogramData(audiogramData) {
+            const audiogramSection = document.getElementById('audiogramSection');
+            const earData = document.getElementById('earData');
+            
+            let earHtml = '';
+            
+            if (audiogramData.left_ear) {
+                earHtml += `
+                    <div class="ear-card">
+                        <div class="ear-title">Left Ear</div>
+                        ${Object.entries(audiogramData.left_ear).map(([freq, htl]) => `
+                            <div class="frequency-item">
+                                <span>${freq}Hz</span>
+                                <span>${htl}dB</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            if (audiogramData.right_ear) {
+                earHtml += `
+                    <div class="ear-card">
+                        <div class="ear-title">Right Ear</div>
+                        ${Object.entries(audiogramData.right_ear).map(([freq, htl]) => `
+                            <div class="frequency-item">
+                                <span>${freq}Hz</span>
+                                <span>${htl}dB</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            if (earHtml) {
+                earData.innerHTML = earHtml;
+                audiogramSection.style.display = 'block';
+            }
         }
 
         function displaySummary(summary) {
@@ -642,6 +659,7 @@
                 'P3b Amplitude', 'P3b Latency', 'Peak Alpha Frequency'
             ];
             
+            // Display main features first
             mainFeatures.forEach(metric => {
                 if (values[metric] !== undefined) {
                     const card = createMetricCard(metric, values[metric], interpretations[metric]);
@@ -649,6 +667,7 @@
                 }
             });
             
+            // Display additional metrics
             Object.keys(values).forEach(metric => {
                 if (!mainFeatures.includes(metric)) {
                     const card = createMetricCard(metric, values[metric], interpretations[metric]);
@@ -661,7 +680,6 @@
             const card = document.createElement('div');
             card.className = 'metric-card';
             
-            const range = clinicalRanges[metric];
             const icon = metricIcons[metric] || '📊';
             
             let interpretationClass = 'normal';
@@ -678,12 +696,6 @@
                 <div class="metric-interpretation ${interpretationClass}">
                     ${interpretation || 'Unknown'}
                 </div>
-                ${range ? `
-                <div class="metric-references">
-                    <strong>Normal:</strong> ${range.normal} | 
-                    <strong>Mild AD:</strong> ${range.mild_ad}
-                </div>
-                ` : ''}
             `;
             
             return card;
