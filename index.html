@@ -451,12 +451,9 @@
             
             <div class="audiogram-section" id="audiogramSection" style="display: none;">
                 <div class="audiogram-title">🔊 Audiogram Analysis</div>
-                <div class="audiogram-container">
-                    <div class="audiogram-chart">
-                        <canvas id="leftEarChart" width="400" height="300"></canvas>
-                    </div>
-                    <div class="audiogram-chart">
-                        <canvas id="rightEarChart" width="400" height="300"></canvas>
+                <div class="audiogram-container" style="grid-template-columns: 1fr; max-width: 800px; margin: 0 auto;">
+                    <div class="audiogram-chart" style="height: 400px;">
+                        <canvas id="combinedAudiogramChart"></canvas>
                     </div>
                 </div>
                 <div class="ear-data" id="earData"></div>
@@ -680,19 +677,31 @@
         function calculateTimelinePosition(value, range) {
             const { normal, mild_ad, direction } = range;
             
-            // Create a scale from best to worst
-            let min, max, position;
+            // Create a scale where we properly position based on clinical significance
+            let position;
             
             if (direction === 'lower') {
                 // For metrics where lower is worse (like Button Press Accuracy)
-                min = mild_ad * 0.8; // Extend below mild_ad
-                max = normal * 1.2;  // Extend above normal
-                position = ((value - min) / (max - min)) * 100;
+                // Scale: mild_ad (0%) -> normal (100%)
+                if (value <= mild_ad) {
+                    position = 0; // Worst side
+                } else if (value >= normal) {
+                    position = 100; // Best side
+                } else {
+                    // Between mild_ad and normal
+                    position = ((value - mild_ad) / (normal - mild_ad)) * 100;
+                }
             } else {
-                // For metrics where higher is worse (like Reaction Time)
-                min = normal * 0.8;  // Extend below normal
-                max = mild_ad * 1.2; // Extend above mild_ad
-                position = ((value - min) / (max - min)) * 100;
+                // For metrics where higher is worse (like Reaction Time, False Alarms)
+                // Scale: normal (100%) -> mild_ad (0%)
+                if (value <= normal) {
+                    position = 100; // Best side
+                } else if (value >= mild_ad) {
+                    position = 0; // Worst side
+                } else {
+                    // Between normal and mild_ad
+                    position = 100 - ((value - normal) / (mild_ad - normal)) * 100;
+                }
             }
             
             // Clamp position between 0 and 100
@@ -707,66 +716,115 @@
                     <div class="timeline-marker" style="left: ${position}%"></div>
                 </div>
                 <div class="timeline-labels">
-                    <span>Better</span>
-                    <span>Normal: ${range.normal}</span>
-                    <span>Mild AD: ${range.mild_ad}</span>
                     <span>Worse</span>
+                    <span>Mild AD: ${range.mild_ad}</span>
+                    <span>Normal: ${range.normal}</span>
+                    <span>Better</span>
                 </div>
             `;
         }
 
-        function createAudiogramChart(canvasId, earData, earName) {
-            const canvas = document.getElementById(canvasId);
+        function createCombinedAudiogramChart() {
+            const canvas = document.getElementById('combinedAudiogramChart');
+            if (!canvas) return;
+            
             const ctx = canvas.getContext('2d');
             
+            // Get current audiogram data from the global scope
+            const currentAudiogramData = window.currentAudiogramData;
+            if (!currentAudiogramData) return;
+            
             const frequencies = [250, 500, 1000, 2000, 4000, 8000];
-            const data = frequencies.map(freq => earData[freq] || 0);
+            const leftData = frequencies.map(freq => currentAudiogramData.left_ear?.[freq] || null);
+            const rightData = frequencies.map(freq => currentAudiogramData.right_ear?.[freq] || null);
             
             new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: frequencies.map(f => f >= 1000 ? `${f/1000}k` : f),
+                    labels: frequencies.map(f => f >= 1000 ? `${f/1000}K` : f),
                     datasets: [{
-                        label: `${earName} Hearing Threshold`,
-                        data: data,
-                        borderColor: earName === 'Left Ear' ? '#667eea' : '#e74c3c',
-                        backgroundColor: earName === 'Left Ear' ? 'rgba(102, 126, 234, 0.1)' : 'rgba(231, 76, 60, 0.1)',
+                        label: 'Left Ear',
+                        data: leftData,
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         borderWidth: 3,
-                        pointRadius: 6,
-                        pointBackgroundColor: earName === 'Left Ear' ? '#667eea' : '#e74c3c',
+                        pointRadius: 8,
+                        pointBackgroundColor: '#3B82F6',
+                        pointBorderColor: '#FFFFFF',
+                        pointBorderWidth: 2,
+                        pointStyle: 'crossRot',
+                        tension: 0.1
+                    }, {
+                        label: 'Right Ear',
+                        data: rightData,
+                        borderColor: '#EF4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 3,
+                        pointRadius: 8,
+                        pointBackgroundColor: '#EF4444',
+                        pointBorderColor: '#FFFFFF',
+                        pointBorderWidth: 2,
+                        pointStyle: 'circle',
                         tension: 0.1
                     }]
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {
                         title: {
                             display: true,
-                            text: earName
+                            text: 'Audiogram - Hearing Threshold Levels',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
                         },
                         legend: {
-                            display: false
+                            display: true,
+                            position: 'bottom'
                         }
                     },
                     scales: {
                         x: {
                             title: {
                                 display: true,
-                                text: 'Frequency (Hz)'
+                                text: 'Frequency (Hz)',
+                                font: {
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                display: true,
+                                color: '#E5E7EB'
                             }
                         },
                         y: {
                             title: {
                                 display: true,
-                                text: 'Hearing Level (dB)'
+                                text: 'Hearing Threshold (dB)',
+                                font: {
+                                    weight: 'bold'
+                                }
                             },
                             reverse: true,
-                            min: -10,
+                            min: 0,
                             max: 80,
                             ticks: {
-                                stepSize: 10
+                                stepSize: 10,
+                                callback: function(value) {
+                                    return value + ' dB';
+                                }
+                            },
+                            grid: {
+                                display: true,
+                                color: '#E5E7EB'
                             }
                         }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     }
                 }
             });
@@ -775,13 +833,11 @@
         function displayAudiogramData(audiogramData, cognisionCompatibility, asymmetryAnalysis) {
             const audiogramSection = document.getElementById('audiogramSection');
             
-            // Create charts
-            if (audiogramData.left_ear) {
-                setTimeout(() => createAudiogramChart('leftEarChart', audiogramData.left_ear, 'Left Ear'), 100);
-            }
-            if (audiogramData.right_ear) {
-                setTimeout(() => createAudiogramChart('rightEarChart', audiogramData.right_ear, 'Right Ear'), 100);
-            }
+            // Store audiogram data globally for chart creation
+            window.currentAudiogramData = audiogramData;
+            
+            // Create combined chart
+            setTimeout(() => createCombinedAudiogramChart(), 100);
             
             // Display numerical data
             const earData = document.getElementById('earData');
@@ -790,7 +846,7 @@
             if (audiogramData.left_ear) {
                 earHtml += `
                     <div class="ear-card">
-                        <div class="ear-title">Left Ear</div>
+                        <div class="ear-title">Left Ear (X)</div>
                         ${Object.entries(audiogramData.left_ear).map(([freq, htl]) => {
                             const freqDisplay = freq < 1000 ? `${freq}Hz` : `${freq/1000}kHz`;
                             let emoji = '🟢';
@@ -812,7 +868,7 @@
             if (audiogramData.right_ear) {
                 earHtml += `
                     <div class="ear-card">
-                        <div class="ear-title">Right Ear</div>
+                        <div class="ear-title">Right Ear (O)</div>
                         ${Object.entries(audiogramData.right_ear).map(([freq, htl]) => {
                             const freqDisplay = freq < 1000 ? `${freq}Hz` : `${freq/1000}kHz`;
                             let emoji = '🟢';
@@ -901,13 +957,14 @@
             const metricGrid = document.getElementById('metricGrid');
             metricGrid.innerHTML = '';
             
+            // Priority order: Main 6 features first
             const mainFeatures = [
-                'Button Press Accuracy', 'False Alarms', 'Median Reaction Time', 
-                'P50 Amplitude', 'P3b Amplitude', 'P3b Latency', 'Peak Alpha Frequency'
+                'Button Press Accuracy', 'Median Reaction Time', 'P50 Amplitude', 
+                'P3b Amplitude', 'P3b Latency', 'Peak Alpha Frequency'
             ];
             
             const additionalFeatures = [
-                'N100 Amplitude', 'P200 Amplitude', 'N200 Amplitude', 
+                'False Alarms', 'N100 Amplitude', 'P200 Amplitude', 'N200 Amplitude', 
                 'P3a Amplitude', 'Slow Wave Amplitude'
             ];
             
@@ -943,6 +1000,16 @@
             else if (interpretation === 'Borderline') interpretationClass = 'borderline';
             else if (interpretation === 'CRITICAL - RETEST REQUIRED') interpretationClass = 'critical';
             
+            // Check for Peak Alpha Frequency critical condition
+            let criticalWarning = '';
+            if (metric === 'Peak Alpha Frequency' && value < 8.0) {
+                criticalWarning = `
+                    <div style="background: #ff1744; color: white; padding: 0.75rem; border-radius: 8px; margin: 0.5rem 0; text-align: center; font-weight: bold; animation: pulse 2s infinite;">
+                        🚨 CRITICAL: Peak Alpha < 8Hz - TEST RELIABILITY COMPROMISED
+                    </div>
+                `;
+            }
+            
             let timelineHtml = '';
             if (range) {
                 timelineHtml = createTimelineVisualization(metric, value, range);
@@ -973,6 +1040,7 @@
                 <div class="metric-interpretation ${interpretationClass}">
                     ${interpretation || 'Unknown'}
                 </div>
+                ${criticalWarning}
                 ${timelineHtml}
                 ${range ? `
                 <div class="metric-references">
