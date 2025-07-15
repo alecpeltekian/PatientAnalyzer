@@ -2,13 +2,13 @@ from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 import tempfile
 import os
-from medical_extractor import SimpleMedicalExtractor
+from medical_extractor import MedicalExtractor
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
 
 # Initialize the extractor
-extractor = SimpleMedicalExtractor()
+extractor = MedicalExtractor()
 
 @app.route('/')
 def index():
