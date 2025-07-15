@@ -273,69 +273,84 @@ class SimpleMedicalExtractor:
         return findings
     
     def generate_study_discussion(self, values: Dict, interpretations: Dict, audiogram_data: Dict = None, asymmetry_analysis: Dict = None) -> str:
-        discussion_lines = []
+        """Generate concise Study Discussion based on extracted values and interpretations"""
+        
+        high_risk_metrics = []
+        borderline_metrics = []
         
         for metric, interpretation in interpretations.items():
-            if metric in values:
-                value = values[metric]
-                range_info = self.clinical_ranges.get(metric, {})
-                normal_val = range_info.get('normal', 'N/A')
-                mild_ad_val = range_info.get('mild_ad', 'N/A')
-                
-                discussion_lines.append(f"{metric}: {interpretation} (Value: {value}, Normal: {normal_val}, Mild AD: {mild_ad_val})")
+            if interpretation == 'High Risk':
+                high_risk_metrics.append(metric)
+            elif interpretation == 'Borderline':
+                borderline_metrics.append(metric)
+        
+        if not high_risk_metrics and not borderline_metrics:
+            return "This is a normal study with all measured parameters within expected ranges."
+        
+        discussion_parts = []
+        
+        abnormal_findings = []
+        if high_risk_metrics:
+            for metric in high_risk_metrics:
+                if metric == 'Button Press Accuracy':
+                    abnormal_findings.append("low button press accuracy")
+                elif metric == 'Median Reaction Time':
+                    abnormal_findings.append("delayed median reaction time")
+                elif metric == 'P3b Latency':
+                    abnormal_findings.append("delayed P3b latency")
+                elif metric == 'P3b Amplitude':
+                    abnormal_findings.append("reduced P3b amplitude")
+                elif metric == 'Peak Alpha Frequency':
+                    abnormal_findings.append("reduced peak alpha frequency")
+                elif metric == 'False Alarms':
+                    abnormal_findings.append("elevated false alarms")
+        
+        if borderline_metrics:
+            for metric in borderline_metrics:
+                if metric == 'P3b Amplitude':
+                    abnormal_findings.append("borderline P3b amplitude")
+                elif metric == 'Button Press Accuracy':
+                    abnormal_findings.append("borderline button press accuracy")
+        
+        if abnormal_findings:
+            if len(abnormal_findings) == 1:
+                discussion_parts.append(f"This is an abnormal study due to {abnormal_findings[0]}.")
+            elif len(abnormal_findings) == 2:
+                discussion_parts.append(f"This is an abnormal study due to {abnormal_findings[0]} and {abnormal_findings[1]}.")
+            else:
+                discussion_parts.append(f"This is an abnormal study due to {', '.join(abnormal_findings[:-1])}, and {abnormal_findings[-1]}.")
+        
+        implications = []
+        
+        if any(metric in ['Button Press Accuracy', 'Median Reaction Time', 'P3b Latency'] for metric in high_risk_metrics):
+            implications.append("reduced stimulus processing (including evaluation and classification speed)")
+        
+        if any(metric in ['Button Press Accuracy', 'P3b Amplitude'] for metric in high_risk_metrics + borderline_metrics):
+            implications.append("reduced attentional resources and executive function")
+        
+        if implications:
+            discussion_parts.append(f"Collectively, study findings suggest {' as well as '.join(implications)}.")
+            discussion_parts.append("These findings suggest increased risk of cognitive dysfunction and premorbid dementia. Clinical correlation is suggested.")
         
         if audiogram_data:
-            discussion_lines.append("\nAudiogram Results:")
+            hearing_issues = []
             for ear in ['left_ear', 'right_ear']:
                 if ear in audiogram_data:
-                    ear_name = ear.replace('_', ' ').title()
-                    discussion_lines.append(f"{ear_name}:")
-                    for freq in sorted(audiogram_data[ear].keys()):
-                        htl = audiogram_data[ear][freq]
-                        freq_display = f"{freq}Hz" if freq < 1000 else f"{freq//1000}kHz"
-                        discussion_lines.append(f"  {freq_display}: {htl}dB")
+                    severe_loss = any(htl > 55 for htl in audiogram_data[ear].values())
+                    moderate_loss = any(41 <= htl <= 55 for htl in audiogram_data[ear].values())
+                    if severe_loss:
+                        hearing_issues.append(f"{ear.replace('_', ' ')} moderate-severe hearing loss")
+                    elif moderate_loss:
+                        hearing_issues.append(f"{ear.replace('_', ' ')} moderate hearing loss")
             
-            if asymmetry_analysis and asymmetry_analysis.get('asymmetries'):
-                discussion_lines.append("\nEar-to-Ear Asymmetry Analysis:")
-                for freq, asym_data in asymmetry_analysis['asymmetries'].items():
-                    freq_display = f"{freq}Hz" if freq < 1000 else f"{freq//1000}kHz"
-                    asymmetry = asym_data['asymmetry_db']
-                    worse_ear = asym_data['worse_ear']
-                    
-                    flag = ""
-                    if asymmetry >= 15:
-                        flag = " ⚠️ SIGNIFICANT"
-                    elif asymmetry >= 10:
-                        flag = " ⚠️ NOTABLE"
-                    
-                    discussion_lines.append(f"  {freq_display}: {asymmetry}dB asymmetry (worse ear: {worse_ear}){flag}")
+            if hearing_issues or (asymmetry_analysis and asymmetry_analysis.get('max_asymmetry', 0) > 25):
+                discussion_parts.append("")  # Line break
+                if hearing_issues:
+                    discussion_parts.append(f"Audiogram reveals {' and '.join(hearing_issues)}.")
+                if asymmetry_analysis and asymmetry_analysis.get('max_asymmetry', 0) > 25:
+                    discussion_parts.append(f"Significant ear-to-ear asymmetry noted (max {asymmetry_analysis['max_asymmetry']}dB).")
         
-        explanations = []
-        
-        for metric, interpretation in interpretations.items():
-            if interpretation in ['High Risk', 'Borderline']:
-                severity = "severely" if interpretation == 'High Risk' else "moderately"
-                
-                if metric == 'Button Press Accuracy':
-                    explanations.append(f"Button press accuracy is {severity} reduced, indicating {severity} impaired ability to maintain attention and executive control during target detection tasks.")
-                elif metric == 'False Alarms':
-                    explanations.append(f"False alarm rate is {severity} elevated, suggesting {severity} compromised inhibitory control and response selection difficulties.")
-                elif metric == 'Median Reaction Time':
-                    explanations.append(f"Reaction time is {severity} prolonged, reflecting {severity} slowed cognitive processing and potential executive dysfunction.")
-                elif metric == 'P50 Amplitude':
-                    explanations.append(f"P50 amplitude is {severity} altered, indicating {severity} impaired sensory gating and pre-attentive filtering mechanisms.")
-                elif metric == 'P3b Amplitude':
-                    explanations.append(f"P3b amplitude is {severity} reduced, reflecting {severity} diminished attentional resources allocated to target stimulus processing.")
-                elif metric == 'P3b Latency':
-                    explanations.append(f"P3b latency is {severity} delayed, indicating {severity} slowed stimulus evaluation and classification processes.")
-                elif metric == 'Peak Alpha Frequency':
-                    explanations.append(f"Peak alpha frequency is {severity} reduced, suggesting {severity} altered cortical arousal and attention network dysfunction.")
-        
-        discussion = '\n'.join(discussion_lines)
-        if explanations:
-            discussion += '\n\nClinical Significance:\n' + '\n'.join(explanations)
-        
-        return discussion
+        return ' '.join(discussion_parts)
     
     def extract_all_values(self, text: str) -> Dict:
         values = {}
