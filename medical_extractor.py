@@ -3,7 +3,7 @@ import re
 import pandas as pd
 from typing import Dict
 
-class MedicalExtractor:
+class SimpleMedicalExtractor:
     def __init__(self):
         self.clinical_ranges = {
             'Button Press Accuracy': {'normal': 94.1, 'mild_ad': 82.2, 'direction': 'lower'},

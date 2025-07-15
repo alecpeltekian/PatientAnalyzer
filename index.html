@@ -428,6 +428,21 @@
             'Peak Alpha Frequency': '🌊'
         };
 
+        const clinicalRanges = {
+            'Button Press Accuracy': { normal: 94.1, mild_ad: 82.2, direction: 'lower' },
+            'False Alarms': { normal: 1.1, mild_ad: 4.9, direction: 'higher' },
+            'Median Reaction Time': { normal: 458, mild_ad: 499, direction: 'higher' },
+            'P50 Amplitude': { normal: 2.77, mild_ad: 2.95, direction: 'higher' },
+            'N100 Amplitude': { normal: -7.23, mild_ad: -6.00, direction: 'higher' },
+            'P200 Amplitude': { normal: 5.26, mild_ad: 4.64, direction: 'lower' },
+            'N200 Amplitude': { normal: -0.31, mild_ad: -1.10, direction: 'lower' },
+            'P3b Amplitude': { normal: 6.03, mild_ad: 4.42, direction: 'lower' },
+            'P3b Latency': { normal: 396.0, mild_ad: 419.6, direction: 'higher' },
+            'Slow Wave Amplitude': { normal: -2.54, mild_ad: -2.65, direction: 'lower' },
+            'P3a Amplitude': { normal: 5.88, mild_ad: 3.63, direction: 'lower' },
+            'Peak Alpha Frequency': { normal: 9.39, mild_ad: 8.34, direction: 'lower' }
+        };
+
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         const loading = document.getElementById('loading');
@@ -513,8 +528,12 @@
             const values = apiData.extracted_values || {};
             const interpretations = apiData.clinical_interpretations || {};
             const audiogramData = apiData.audiogram_data || null;
+            const audiogramInterpretations = apiData.audiogram_interpretations || {};
+            const cognisionCompatibility = apiData.cognision_compatibility || {};
+            const asymmetryAnalysis = apiData.asymmetry_analysis || {};
             const findings = apiData.generated_study_findings || '';
             const discussion = apiData.generated_study_discussion || '';
+            const originalInterpretations = apiData.original_interpretations || {};
             
             // Generate summary statistics
             const summary = generateSummary(interpretations);
@@ -524,8 +543,12 @@
                 interpretations,
                 summary,
                 audiogramData,
+                audiogramInterpretations,
+                cognisionCompatibility,
+                asymmetryAnalysis,
                 findings,
-                discussion
+                discussion,
+                originalInterpretations
             };
         }
 
@@ -545,19 +568,24 @@
         }
 
         function displayResults(analysisResults) {
-            const { values, interpretations, summary, audiogramData, findings } = analysisResults;
+            const { values, interpretations, summary, audiogramData, cognisionCompatibility, asymmetryAnalysis, findings, discussion, originalInterpretations } = analysisResults;
             
             displaySummary(summary);
-            displayMetrics(values, interpretations);
+            displayMetrics(values, interpretations, originalInterpretations);
             
             // Display study findings if available
             if (findings) {
                 displayStudyFindings(findings);
             }
             
+            // Display detailed discussion if available
+            if (discussion) {
+                displayStudyDiscussion(discussion);
+            }
+            
             // Display audiogram data if available
             if (audiogramData && (audiogramData.left_ear || audiogramData.right_ear)) {
-                displayAudiogramData(audiogramData);
+                displayAudiogramData(audiogramData, cognisionCompatibility, asymmetryAnalysis);
             }
             
             const resultsElement = document.getElementById('results');
@@ -586,22 +614,55 @@
             findingsSection.querySelector('.findings-content').innerHTML = findings;
         }
 
-        function displayAudiogramData(audiogramData) {
+        function displayStudyDiscussion(discussion) {
+            let discussionSection = document.getElementById('studyDiscussion');
+            
+            if (!discussionSection) {
+                // Create discussion section
+                discussionSection = document.createElement('div');
+                discussionSection.id = 'studyDiscussion';
+                discussionSection.className = 'findings-section';
+                discussionSection.innerHTML = `
+                    <h3>💭 Study Discussion</h3>
+                    <div class="findings-content"></div>
+                `;
+                
+                const resultsContainer = document.getElementById('results');
+                const findingsSection = document.getElementById('studyFindings');
+                const insertAfter = findingsSection || document.getElementById('summary');
+                resultsContainer.insertBefore(discussionSection, insertAfter.nextSibling);
+            }
+            
+            // Format discussion with proper line breaks
+            const formattedDiscussion = discussion.replace(/\n/g, '<br>');
+            discussionSection.querySelector('.findings-content').innerHTML = formattedDiscussion;
+        }
+
+        function displayAudiogramData(audiogramData, cognisionCompatibility, asymmetryAnalysis) {
             const audiogramSection = document.getElementById('audiogramSection');
             const earData = document.getElementById('earData');
             
             let earHtml = '';
             
+            // Display ear data
             if (audiogramData.left_ear) {
                 earHtml += `
                     <div class="ear-card">
                         <div class="ear-title">Left Ear</div>
-                        ${Object.entries(audiogramData.left_ear).map(([freq, htl]) => `
-                            <div class="frequency-item">
-                                <span>${freq}Hz</span>
-                                <span>${htl}dB</span>
-                            </div>
-                        `).join('')}
+                        ${Object.entries(audiogramData.left_ear).map(([freq, htl]) => {
+                            const freqDisplay = freq < 1000 ? `${freq}Hz` : `${freq/1000}kHz`;
+                            let emoji = '🟢';
+                            if (htl > 55) emoji = '🔴';
+                            else if (htl > 40) emoji = '🟠';
+                            else if (htl > 25) emoji = '🟡';
+                            
+                            return `
+                                <div class="frequency-item">
+                                    <span>${emoji} ${freqDisplay}</span>
+                                    <span>${htl}dB</span>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 `;
             }
@@ -610,18 +671,66 @@
                 earHtml += `
                     <div class="ear-card">
                         <div class="ear-title">Right Ear</div>
-                        ${Object.entries(audiogramData.right_ear).map(([freq, htl]) => `
-                            <div class="frequency-item">
-                                <span>${freq}Hz</span>
-                                <span>${htl}dB</span>
-                            </div>
-                        `).join('')}
+                        ${Object.entries(audiogramData.right_ear).map(([freq, htl]) => {
+                            const freqDisplay = freq < 1000 ? `${freq}Hz` : `${freq/1000}kHz`;
+                            let emoji = '🟢';
+                            if (htl > 55) emoji = '🔴';
+                            else if (htl > 40) emoji = '🟠';
+                            else if (htl > 25) emoji = '🟡';
+                            
+                            return `
+                                <div class="frequency-item">
+                                    <span>${emoji} ${freqDisplay}</span>
+                                    <span>${htl}dB</span>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 `;
             }
             
             if (earHtml) {
                 earData.innerHTML = earHtml;
+                
+                // Add COGNISION compatibility info
+                let compatibilityHtml = '<div class="compatibility-section" style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.8); border-radius: 8px;">';
+                compatibilityHtml += '<h4 style="margin-bottom: 0.5rem; color: #667eea;">🧠 COGNISION Compatibility</h4>';
+                
+                if (cognisionCompatibility.compatible) {
+                    compatibilityHtml += '<p style="color: #51cf66;">✅ All frequencies ≤45dB - Compatible with COGNISION testing</p>';
+                } else {
+                    compatibilityHtml += '<p style="color: #ff6b6b;">⚠️ Some frequencies >45dB - May affect test reliability</p>';
+                    if (cognisionCompatibility.issues) {
+                        compatibilityHtml += '<ul style="margin-top: 0.5rem; padding-left: 1.5rem;">';
+                        cognisionCompatibility.issues.forEach(issue => {
+                            compatibilityHtml += `<li style="color: #666;">${issue}</li>`;
+                        });
+                        compatibilityHtml += '</ul>';
+                    }
+                }
+                compatibilityHtml += '</div>';
+                
+                // Add asymmetry analysis
+                if (asymmetryAnalysis.asymmetries) {
+                    compatibilityHtml += '<div class="asymmetry-section" style="margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,0.8); border-radius: 8px;">';
+                    compatibilityHtml += '<h4 style="margin-bottom: 0.5rem; color: #667eea;">📊 Ear-to-Ear Asymmetry Analysis</h4>';
+                    compatibilityHtml += `<p style="margin-bottom: 0.5rem;"><strong>Maximum asymmetry:</strong> ${asymmetryAnalysis.max_asymmetry || 0}dB</p>`;
+                    compatibilityHtml += `<p style="margin-bottom: 0.5rem;"><strong>Assessment:</strong> ${asymmetryAnalysis.clinical_significance || 'Normal'}</p>`;
+                    
+                    Object.entries(asymmetryAnalysis.asymmetries).forEach(([freq, data]) => {
+                        const freqDisplay = freq < 1000 ? `${freq}Hz` : `${freq/1000}kHz`;
+                        let emoji = '✅';
+                        if (data.asymmetry_db > 55) emoji = '🚨';
+                        else if (data.asymmetry_db > 40) emoji = '⚠️';
+                        else if (data.asymmetry_db > 25) emoji = '⚠️';
+                        
+                        compatibilityHtml += `<div style="font-size: 0.9rem; margin: 0.25rem 0;">${emoji} ${freqDisplay}: ${data.asymmetry_db}dB asymmetry (${data.asymmetry_classification})</div>`;
+                    });
+                    
+                    compatibilityHtml += '</div>';
+                }
+                
+                earData.innerHTML += compatibilityHtml;
                 audiogramSection.style.display = 'block';
             }
         }
@@ -650,52 +759,81 @@
             `;
         }
 
-        function displayMetrics(values, interpretations) {
+        function displayMetrics(values, interpretations, originalInterpretations) {
             const metricGrid = document.getElementById('metricGrid');
             metricGrid.innerHTML = '';
             
             const mainFeatures = [
-                'Button Press Accuracy', 'Median Reaction Time', 'P50 Amplitude',
-                'P3b Amplitude', 'P3b Latency', 'Peak Alpha Frequency'
+                'Button Press Accuracy', 'False Alarms', 'Median Reaction Time', 
+                'P50 Amplitude', 'P3b Amplitude', 'P3b Latency', 'Peak Alpha Frequency'
+            ];
+            
+            const additionalFeatures = [
+                'N100 Amplitude', 'P200 Amplitude', 'N200 Amplitude', 
+                'P3a Amplitude', 'Slow Wave Amplitude'
             ];
             
             // Display main features first
             mainFeatures.forEach(metric => {
                 if (values[metric] !== undefined) {
-                    const card = createMetricCard(metric, values[metric], interpretations[metric]);
+                    const card = createMetricCard(metric, values[metric], interpretations[metric], originalInterpretations[metric], true);
                     metricGrid.appendChild(card);
                 }
             });
             
-            // Display additional metrics
-            Object.keys(values).forEach(metric => {
-                if (!mainFeatures.includes(metric)) {
-                    const card = createMetricCard(metric, values[metric], interpretations[metric]);
+            // Display additional ERP features
+            additionalFeatures.forEach(metric => {
+                if (values[metric] !== undefined) {
+                    const card = createMetricCard(metric, values[metric], interpretations[metric], originalInterpretations[metric], false);
                     metricGrid.appendChild(card);
                 }
             });
         }
 
-        function createMetricCard(metric, value, interpretation) {
+        function createMetricCard(metric, value, interpretation, originalInterpretation, isMainFeature) {
             const card = document.createElement('div');
             card.className = 'metric-card';
+            if (isMainFeature) {
+                card.style.border = '2px solid rgba(102, 126, 234, 0.3)';
+            }
             
             const icon = metricIcons[metric] || '📊';
+            const range = clinicalRanges[metric];
             
             let interpretationClass = 'normal';
             if (interpretation === 'High Risk') interpretationClass = 'high-risk';
             else if (interpretation === 'Borderline') interpretationClass = 'borderline';
             else if (interpretation === 'CRITICAL - RETEST REQUIRED') interpretationClass = 'critical';
             
+            let originalInterpretationHtml = '';
+            if (originalInterpretation) {
+                let originalClass = 'normal';
+                if (['Low', 'Delayed', 'High Risk'].includes(originalInterpretation)) originalClass = 'high-risk';
+                else if (originalInterpretation === 'Borderline') originalClass = 'borderline';
+                
+                originalInterpretationHtml = `
+                    <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f0f0f0; border-radius: 6px; font-size: 0.8rem;">
+                        <strong>Original Report:</strong> <span class="metric-interpretation ${originalClass}" style="display: inline; padding: 0.2rem 0.5rem; margin-left: 0.5rem;">${originalInterpretation}</span>
+                    </div>
+                `;
+            }
+            
             card.innerHTML = `
                 <div class="metric-header">
                     <span class="metric-icon">${icon}</span>
-                    <span class="metric-name">${metric}</span>
+                    <span class="metric-name">${metric}${isMainFeature ? ' ⭐' : ''}</span>
                 </div>
                 <div class="metric-value">${value}</div>
                 <div class="metric-interpretation ${interpretationClass}">
                     ${interpretation || 'Unknown'}
                 </div>
+                ${range ? `
+                <div class="metric-references">
+                    <strong>Normal:</strong> ${range.normal} | 
+                    <strong>Mild AD:</strong> ${range.mild_ad}
+                </div>
+                ` : ''}
+                ${originalInterpretationHtml}
             `;
             
             return card;

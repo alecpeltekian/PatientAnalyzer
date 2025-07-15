@@ -1,125 +1,105 @@
-# Medical PDF Analysis Dashboard
+# Medical PDF Analysis Dashboard - Full Stack
 
-A professional web application for analyzing COGNISION medical reports with advanced clinical interpretation and beautiful visualization.
+A professional web application with Python Flask API backend and beautiful HTML frontend for analyzing COGNISION medical reports.
+
+## 🏗️ Architecture
+
+**Backend (Python Flask API):**
+- Uses your sophisticated `SimpleMedicalExtractor` class
+- Handles PDF processing, text extraction, and clinical analysis
+- RESTful API endpoints for analysis
+
+**Frontend (HTML/CSS/JavaScript):**
+- Beautiful glassmorphism design
+- Drag & drop PDF upload
+- Real-time analysis results display
+- Responsive design for all devices
 
 ## 🌟 Features
 
-- **PDF Upload & Analysis**: Drag-and-drop PDF upload with real-time processing
+- **Advanced PDF Analysis**: Uses your complete Python extraction logic
 - **Clinical Interpretation**: Automatic analysis using established clinical ranges
 - **Beautiful Dashboard**: Modern, responsive design with interactive metrics
 - **Risk Assessment**: Color-coded risk levels (Normal, Borderline, High Risk, Critical)
-- **Audiogram Analysis**: Comprehensive hearing threshold analysis
-- **Export Results**: Download analysis results as CSV
+- **Audiogram Analysis**: Comprehensive hearing threshold analysis with asymmetry detection
+- **Study Findings**: Auto-generated clinical findings and discussion
 
-## 🧠 Analyzed Metrics
+## 📁 Project Structure
 
-### Core Clinical Features
-- **Button Press Accuracy**: Attention and executive control assessment
+```
+medical-pdf-analyzer/
+├── app.py                   # Flask API server
+├── medical_extractor.py     # Your medical extraction logic
+├── index.html              # Frontend dashboard
+├── requirements.txt        # Python dependencies
+├── README.md              # Documentation
+└── .gitignore             # Git ignore rules
+```
+
+## 🚀 Deployment on Render
+
+### **Backend Setup (Web Service):**
+1. **Service Type**: Web Service
+2. **Language**: Python 3
+3. **Build Command**: `pip install -r requirements.txt`
+4. **Start Command**: `gunicorn app:app`
+5. **Instance Type**: Free (512MB RAM)
+
+### **Environment Variables:**
+```
+FLASK_ENV=production
+PORT=10000
+```
+
+## 💻 Local Development
+
+1. **Clone and setup:**
+```bash
+git clone https://github.com/yourusername/medical-pdf-analyzer.git
+cd medical-pdf-analyzer
+pip install -r requirements.txt
+```
+
+2. **Run locally:**
+```bash
+python app.py
+```
+
+3. **Access dashboard:**
+```
+http://localhost:5000
+```
+
+## 🔧 API Endpoints
+
+- `GET /` - Main dashboard interface
+- `POST /api/analyze` - Analyze PDF file
+- `GET /api/health` - Health check
+- `GET /api/clinical-ranges` - Get clinical reference ranges
+
+## 📊 Analysis Features
+
+### Core Clinical Metrics
+- **Button Press Accuracy**: Attention and executive control
 - **False Alarms**: Inhibitory control evaluation  
 - **Median Reaction Time**: Cognitive processing speed
 - **P50 Amplitude**: Sensory gating mechanisms
 - **P3b Amplitude & Latency**: Attentional resource allocation
 - **Peak Alpha Frequency**: Cortical arousal and attention networks
 
-### Audiogram Analysis
-- Hearing threshold levels across frequencies (250Hz - 8kHz)
-- Ear-to-ear asymmetry detection
-- COGNISION test compatibility assessment
-- Clinical hearing loss classification
-
-## 🚀 Live Demo
-
-Visit: [Your Render URL here]
-
-## 💻 Local Development
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/medical-pdf-analyzer.git
-cd medical-pdf-analyzer
-```
-
-2. Open `index.html` in your browser or serve with a local server:
-```bash
-# Using Python
-python -m http.server 8000
-
-# Using Node.js
-npx serve .
-```
-
-## 📁 Project Structure
-
-```
-medical-pdf-analyzer/
-├── index.html              # Main dashboard interface
-├── medical_extractor.py     # Python backend code (reference)
-├── README.md               # Project documentation
-└── assets/                 # Additional assets (if needed)
-```
-
-## 🔧 Technology Stack
-
-- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
-- **PDF Processing**: PDF.js library
-- **Styling**: Modern CSS with glassmorphism effects
-- **Deployment**: Render static site hosting
-
-## 📊 Clinical Ranges
-
-The application uses established clinical reference ranges:
-
-| Metric | Normal | Mild AD | Direction |
-|--------|---------|---------|-----------|
-| Button Press Accuracy | 94.1% | 82.2% | Lower risk |
-| False Alarms | 1.1 | 4.9 | Higher risk |
-| Median Reaction Time | 458ms | 499ms | Higher risk |
-| P3b Amplitude | 6.03μV | 4.42μV | Lower risk |
-| P3b Latency | 396ms | 419.6ms | Higher risk |
-| Peak Alpha Frequency | 9.39Hz | 8.34Hz | Lower risk |
-
-## 🎨 Features
-
-### Visual Design
-- Modern glassmorphism interface
-- Responsive grid layout
-- Color-coded risk assessment
-- Smooth animations and transitions
-- Professional medical theme
-
-### Functionality
-- Client-side PDF text extraction
-- Real-time analysis and interpretation
-- Interactive metric cards
-- Clinical summary dashboard
-- Error handling and validation
+### Advanced Features
+- **Audiogram Analysis**: Hearing threshold analysis across frequencies
+- **Asymmetry Detection**: Ear-to-ear difference analysis
+- **COGNISION Compatibility**: Test reliability assessment
+- **Clinical Significance**: Auto-generated findings and discussion
 
 ## 🔬 Clinical Interpretation
 
-The dashboard provides automatic clinical interpretation based on:
-
+The system provides automatic clinical interpretation based on:
 - **Normal**: Values within healthy range
-- **Borderline**: Values requiring monitoring
+- **Borderline**: Values requiring monitoring  
 - **High Risk**: Values indicating potential cognitive decline
-- **Critical**: Values requiring immediate retest (Peak Alpha <8Hz)
-
-## 📱 Browser Support
-
-- Chrome/Chromium 80+
-- Firefox 75+
-- Safari 13+
-- Edge 80+
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- **Critical**: Values requiring immediate retest (e.g., Peak Alpha <8Hz)
 
 ## 🏥 Medical Disclaimer
 
@@ -127,7 +107,7 @@ This tool is for research and educational purposes only. Always consult qualifie
 
 ## 📞 Support
 
-For issues or questions, please open a GitHub issue or contact [your-email@domain.com]
+For issues or questions, please open a GitHub issue.
 
 ---
 
