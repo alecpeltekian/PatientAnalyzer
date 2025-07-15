@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medical PDF Analysis Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -128,7 +129,7 @@
 
         .metric-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
             gap: 1.5rem;
             margin: 2rem 0;
         }
@@ -177,6 +178,36 @@
             font-weight: 600;
             text-align: center;
             margin-bottom: 1rem;
+        }
+
+        .metric-timeline {
+            height: 60px;
+            margin: 1rem 0;
+            position: relative;
+            background: linear-gradient(90deg, #51cf66 0%, #ffd93d 50%, #ff6b6b 100%);
+            border-radius: 30px;
+            overflow: hidden;
+        }
+
+        .timeline-marker {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            background: white;
+            border: 3px solid #333;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 2;
+        }
+
+        .timeline-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: #666;
         }
 
         .metric-references {
@@ -287,6 +318,20 @@
             text-align: center;
         }
 
+        .audiogram-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 1.5rem 0;
+        }
+
+        .audiogram-chart {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
         .ear-data {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -359,7 +404,7 @@
                 grid-template-columns: 1fr;
             }
             
-            .ear-data {
+            .ear-data, .audiogram-container {
                 grid-template-columns: 1fr;
             }
             
@@ -406,6 +451,14 @@
             
             <div class="audiogram-section" id="audiogramSection" style="display: none;">
                 <div class="audiogram-title">🔊 Audiogram Analysis</div>
+                <div class="audiogram-container">
+                    <div class="audiogram-chart">
+                        <canvas id="leftEarChart" width="400" height="300"></canvas>
+                    </div>
+                    <div class="audiogram-chart">
+                        <canvas id="rightEarChart" width="400" height="300"></canvas>
+                    </div>
+                </div>
                 <div class="ear-data" id="earData"></div>
                 <div id="asymmetryAnalysis"></div>
             </div>
@@ -491,11 +544,9 @@
             showLoading();
             
             try {
-                // Create FormData to send PDF to Python backend
                 const formData = new FormData();
                 formData.append('pdf', file);
                 
-                // Send PDF to Python API for processing
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
                     body: formData
@@ -509,7 +560,6 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Process the results from Python extractor
                     const analysisResults = processApiResults(result.data);
                     displayResults(analysisResults);
                 } else {
@@ -524,18 +574,15 @@
         }
 
         function processApiResults(apiData) {
-            // Extract data from your Python SimpleMedicalExtractor results
             const values = apiData.extracted_values || {};
             const interpretations = apiData.clinical_interpretations || {};
             const audiogramData = apiData.audiogram_data || null;
-            const audiogramInterpretations = apiData.audiogram_interpretations || {};
-            const cognisionCompatibility = apiData.cognision_compatibility || {};
-            const asymmetryAnalysis = apiData.asymmetry_analysis || {};
             const findings = apiData.generated_study_findings || '';
             const discussion = apiData.generated_study_discussion || '';
             const originalInterpretations = apiData.original_interpretations || {};
+            const cognisionCompatibility = apiData.cognision_compatibility || {};
+            const asymmetryAnalysis = apiData.asymmetry_analysis || {};
             
-            // Generate summary statistics
             const summary = generateSummary(interpretations);
             
             return {
@@ -543,12 +590,11 @@
                 interpretations,
                 summary,
                 audiogramData,
-                audiogramInterpretations,
-                cognisionCompatibility,
-                asymmetryAnalysis,
                 findings,
                 discussion,
-                originalInterpretations
+                originalInterpretations,
+                cognisionCompatibility,
+                asymmetryAnalysis
             };
         }
 
@@ -568,22 +614,19 @@
         }
 
         function displayResults(analysisResults) {
-            const { values, interpretations, summary, audiogramData, cognisionCompatibility, asymmetryAnalysis, findings, discussion, originalInterpretations } = analysisResults;
+            const { values, interpretations, summary, audiogramData, findings, discussion, originalInterpretations, cognisionCompatibility, asymmetryAnalysis } = analysisResults;
             
             displaySummary(summary);
             displayMetrics(values, interpretations, originalInterpretations);
             
-            // Display study findings if available
             if (findings) {
                 displayStudyFindings(findings);
             }
             
-            // Display detailed discussion if available
             if (discussion) {
                 displayStudyDiscussion(discussion);
             }
             
-            // Display audiogram data if available
             if (audiogramData && (audiogramData.left_ear || audiogramData.right_ear)) {
                 displayAudiogramData(audiogramData, cognisionCompatibility, asymmetryAnalysis);
             }
@@ -597,7 +640,6 @@
             let findingsSection = document.getElementById('studyFindings');
             
             if (!findingsSection) {
-                // Create findings section
                 findingsSection = document.createElement('div');
                 findingsSection.id = 'studyFindings';
                 findingsSection.className = 'findings-section';
@@ -611,14 +653,13 @@
                 resultsContainer.insertBefore(findingsSection, summarySection.nextSibling);
             }
             
-            findingsSection.querySelector('.findings-content').innerHTML = findings;
+            findingsSection.querySelector('.findings-content').innerHTML = findings.replace(/\n/g, '<br>');
         }
 
         function displayStudyDiscussion(discussion) {
             let discussionSection = document.getElementById('studyDiscussion');
             
             if (!discussionSection) {
-                // Create discussion section
                 discussionSection = document.createElement('div');
                 discussionSection.id = 'studyDiscussion';
                 discussionSection.className = 'findings-section';
@@ -633,18 +674,119 @@
                 resultsContainer.insertBefore(discussionSection, insertAfter.nextSibling);
             }
             
-            // Format discussion with proper line breaks
-            const formattedDiscussion = discussion.replace(/\n/g, '<br>');
-            discussionSection.querySelector('.findings-content').innerHTML = formattedDiscussion;
+            discussionSection.querySelector('.findings-content').innerHTML = discussion.replace(/\n/g, '<br>');
+        }
+
+        function calculateTimelinePosition(value, range) {
+            const { normal, mild_ad, direction } = range;
+            
+            // Create a scale from best to worst
+            let min, max, position;
+            
+            if (direction === 'lower') {
+                // For metrics where lower is worse (like Button Press Accuracy)
+                min = mild_ad * 0.8; // Extend below mild_ad
+                max = normal * 1.2;  // Extend above normal
+                position = ((value - min) / (max - min)) * 100;
+            } else {
+                // For metrics where higher is worse (like Reaction Time)
+                min = normal * 0.8;  // Extend below normal
+                max = mild_ad * 1.2; // Extend above mild_ad
+                position = ((value - min) / (max - min)) * 100;
+            }
+            
+            // Clamp position between 0 and 100
+            return Math.max(0, Math.min(100, position));
+        }
+
+        function createTimelineVisualization(metric, value, range) {
+            const position = calculateTimelinePosition(value, range);
+            
+            return `
+                <div class="metric-timeline">
+                    <div class="timeline-marker" style="left: ${position}%"></div>
+                </div>
+                <div class="timeline-labels">
+                    <span>Better</span>
+                    <span>Normal: ${range.normal}</span>
+                    <span>Mild AD: ${range.mild_ad}</span>
+                    <span>Worse</span>
+                </div>
+            `;
+        }
+
+        function createAudiogramChart(canvasId, earData, earName) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            const frequencies = [250, 500, 1000, 2000, 4000, 8000];
+            const data = frequencies.map(freq => earData[freq] || 0);
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: frequencies.map(f => f >= 1000 ? `${f/1000}k` : f),
+                    datasets: [{
+                        label: `${earName} Hearing Threshold`,
+                        data: data,
+                        borderColor: earName === 'Left Ear' ? '#667eea' : '#e74c3c',
+                        backgroundColor: earName === 'Left Ear' ? 'rgba(102, 126, 234, 0.1)' : 'rgba(231, 76, 60, 0.1)',
+                        borderWidth: 3,
+                        pointRadius: 6,
+                        pointBackgroundColor: earName === 'Left Ear' ? '#667eea' : '#e74c3c',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: earName
+                        },
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Frequency (Hz)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Hearing Level (dB)'
+                            },
+                            reverse: true,
+                            min: -10,
+                            max: 80,
+                            ticks: {
+                                stepSize: 10
+                            }
+                        }
+                    }
+                }
+            });
         }
 
         function displayAudiogramData(audiogramData, cognisionCompatibility, asymmetryAnalysis) {
             const audiogramSection = document.getElementById('audiogramSection');
-            const earData = document.getElementById('earData');
             
+            // Create charts
+            if (audiogramData.left_ear) {
+                setTimeout(() => createAudiogramChart('leftEarChart', audiogramData.left_ear, 'Left Ear'), 100);
+            }
+            if (audiogramData.right_ear) {
+                setTimeout(() => createAudiogramChart('rightEarChart', audiogramData.right_ear, 'Right Ear'), 100);
+            }
+            
+            // Display numerical data
+            const earData = document.getElementById('earData');
             let earHtml = '';
             
-            // Display ear data
             if (audiogramData.left_ear) {
                 earHtml += `
                     <div class="ear-card">
@@ -692,30 +834,27 @@
             if (earHtml) {
                 earData.innerHTML = earHtml;
                 
-                // Add COGNISION compatibility info
-                let compatibilityHtml = '<div class="compatibility-section" style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.8); border-radius: 8px;">';
-                compatibilityHtml += '<h4 style="margin-bottom: 0.5rem; color: #667eea;">🧠 COGNISION Compatibility</h4>';
+                // Add compatibility and asymmetry info
+                let additionalInfo = '<div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.8); border-radius: 8px;">';
+                additionalInfo += '<h4 style="margin-bottom: 0.5rem; color: #667eea;">🧠 COGNISION Compatibility</h4>';
                 
                 if (cognisionCompatibility.compatible) {
-                    compatibilityHtml += '<p style="color: #51cf66;">✅ All frequencies ≤45dB - Compatible with COGNISION testing</p>';
+                    additionalInfo += '<p style="color: #51cf66;">✅ All frequencies ≤45dB - Compatible with COGNISION testing</p>';
                 } else {
-                    compatibilityHtml += '<p style="color: #ff6b6b;">⚠️ Some frequencies >45dB - May affect test reliability</p>';
+                    additionalInfo += '<p style="color: #ff6b6b;">⚠️ Some frequencies >45dB - May affect test reliability</p>';
                     if (cognisionCompatibility.issues) {
-                        compatibilityHtml += '<ul style="margin-top: 0.5rem; padding-left: 1.5rem;">';
+                        additionalInfo += '<ul style="margin-top: 0.5rem; padding-left: 1.5rem;">';
                         cognisionCompatibility.issues.forEach(issue => {
-                            compatibilityHtml += `<li style="color: #666;">${issue}</li>`;
+                            additionalInfo += `<li style="color: #666;">${issue}</li>`;
                         });
-                        compatibilityHtml += '</ul>';
+                        additionalInfo += '</ul>';
                     }
                 }
-                compatibilityHtml += '</div>';
                 
-                // Add asymmetry analysis
                 if (asymmetryAnalysis.asymmetries) {
-                    compatibilityHtml += '<div class="asymmetry-section" style="margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,0.8); border-radius: 8px;">';
-                    compatibilityHtml += '<h4 style="margin-bottom: 0.5rem; color: #667eea;">📊 Ear-to-Ear Asymmetry Analysis</h4>';
-                    compatibilityHtml += `<p style="margin-bottom: 0.5rem;"><strong>Maximum asymmetry:</strong> ${asymmetryAnalysis.max_asymmetry || 0}dB</p>`;
-                    compatibilityHtml += `<p style="margin-bottom: 0.5rem;"><strong>Assessment:</strong> ${asymmetryAnalysis.clinical_significance || 'Normal'}</p>`;
+                    additionalInfo += '<h4 style="margin: 1rem 0 0.5rem; color: #667eea;">📊 Asymmetry Analysis</h4>';
+                    additionalInfo += `<p style="margin-bottom: 0.5rem;"><strong>Maximum asymmetry:</strong> ${asymmetryAnalysis.max_asymmetry || 0}dB</p>`;
+                    additionalInfo += `<p style="margin-bottom: 0.5rem;"><strong>Assessment:</strong> ${asymmetryAnalysis.clinical_significance || 'Normal'}</p>`;
                     
                     Object.entries(asymmetryAnalysis.asymmetries).forEach(([freq, data]) => {
                         const freqDisplay = freq < 1000 ? `${freq}Hz` : `${freq/1000}kHz`;
@@ -724,13 +863,12 @@
                         else if (data.asymmetry_db > 40) emoji = '⚠️';
                         else if (data.asymmetry_db > 25) emoji = '⚠️';
                         
-                        compatibilityHtml += `<div style="font-size: 0.9rem; margin: 0.25rem 0;">${emoji} ${freqDisplay}: ${data.asymmetry_db}dB asymmetry (${data.asymmetry_classification})</div>`;
+                        additionalInfo += `<div style="font-size: 0.9rem; margin: 0.25rem 0;">${emoji} ${freqDisplay}: ${data.asymmetry_db}dB asymmetry (${data.asymmetry_classification})</div>`;
                     });
-                    
-                    compatibilityHtml += '</div>';
                 }
                 
-                earData.innerHTML += compatibilityHtml;
+                additionalInfo += '</div>';
+                earData.innerHTML += additionalInfo;
                 audiogramSection.style.display = 'block';
             }
         }
@@ -805,6 +943,11 @@
             else if (interpretation === 'Borderline') interpretationClass = 'borderline';
             else if (interpretation === 'CRITICAL - RETEST REQUIRED') interpretationClass = 'critical';
             
+            let timelineHtml = '';
+            if (range) {
+                timelineHtml = createTimelineVisualization(metric, value, range);
+            }
+            
             let originalInterpretationHtml = '';
             if (originalInterpretation) {
                 let originalClass = 'normal';
@@ -813,7 +956,10 @@
                 
                 originalInterpretationHtml = `
                     <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f0f0f0; border-radius: 6px; font-size: 0.8rem;">
-                        <strong>Original Report:</strong> <span class="metric-interpretation ${originalClass}" style="display: inline; padding: 0.2rem 0.5rem; margin-left: 0.5rem;">${originalInterpretation}</span>
+                        <strong>Original Report:</strong> 
+                        <span class="metric-interpretation ${originalClass}" style="display: inline; padding: 0.2rem 0.5rem; margin-left: 0.5rem; font-size: 0.75rem;">
+                            ${originalInterpretation}
+                        </span>
                     </div>
                 `;
             }
@@ -827,6 +973,7 @@
                 <div class="metric-interpretation ${interpretationClass}">
                     ${interpretation || 'Unknown'}
                 </div>
+                ${timelineHtml}
                 ${range ? `
                 <div class="metric-references">
                     <strong>Normal:</strong> ${range.normal} | 
@@ -851,7 +998,6 @@
         function showError(message) {
             hideLoading();
             
-            // Remove any existing error messages
             const existingErrors = document.querySelectorAll('.error');
             existingErrors.forEach(error => error.remove());
             
