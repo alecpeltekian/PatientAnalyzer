@@ -445,14 +445,18 @@
             }
         });
 
-        uploadArea.addEventListener('click', () => {
-            fileInput.click();
+        uploadArea.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                fileInput.click();
+            }
         });
 
         function handleFileSelect(event) {
             const file = event.target.files[0];
-            if (file) {
+            if (file && file.type === 'application/pdf') {
                 handleFile(file);
+            } else if (file) {
+                showError('Please select a PDF file.');
             }
         }
 
@@ -600,9 +604,9 @@
             displaySummary(summary);
             displayMetrics(values, interpretations);
             
-            const resultsSection = document.getElementById('results');
-            resultsSection.style.display = 'block';
-            resultsSection.scrollIntoView({ behavior: 'smooth' });
+            const resultsElement = document.getElementById('results');
+            resultsElement.style.display = 'block';
+            resultsElement.scrollIntoView({ behavior: 'smooth' });
         }
 
         function displaySummary(summary) {
@@ -695,12 +699,18 @@
         }
 
         function showError(message) {
+            hideLoading();
+            
+            // Remove any existing error messages
+            const existingErrors = document.querySelectorAll('.error');
+            existingErrors.forEach(error => error.remove());
+            
             const errorDiv = document.createElement('div');
             errorDiv.className = 'error';
             errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
             
-            const container = document.querySelector('.container');
-            container.appendChild(errorDiv);
+            const uploadSection = document.querySelector('.upload-section');
+            uploadSection.appendChild(errorDiv);
             
             setTimeout(() => {
                 errorDiv.remove();
