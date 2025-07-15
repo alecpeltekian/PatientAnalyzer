@@ -594,14 +594,15 @@
             return counts;
         }
 
-        function displayResults(results) {
-            const { values, interpretations, summary } = results;
+        function displayResults(analysisResults) {
+            const { values, interpretations, summary } = analysisResults;
             
             displaySummary(summary);
             displayMetrics(values, interpretations);
             
-            results.style.display = 'block';
-            results.scrollIntoView({ behavior: 'smooth' });
+            const resultsSection = document.getElementById('results');
+            resultsSection.style.display = 'block';
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
         }
 
         function displaySummary(summary) {
